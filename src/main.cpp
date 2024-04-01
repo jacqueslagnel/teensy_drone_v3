@@ -1,12 +1,12 @@
 #include <Arduino.h>
 #include <Servo.h>
 
-// I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
-// for both classes must be in the include path of your project
 #include <RF24.h>
 #include <SPI.h>
 #include <nRF24L01.h>
 
+// I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
+// for both classes must be in the include path of your project
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "Wire.h"
@@ -31,7 +31,7 @@ float euler[3]; // [psi, theta, phi]    Euler angle container
 float ypr[3]; // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
 //=============================================================================
-// define motors servos
+// ===                      define motors & servos                         ====
 //=============================================================================
 #define PIN_FL 40
 #define PIN_RL 41
@@ -99,7 +99,7 @@ IRQ  -> 32  (non lie a SPI donc peut etre changee)
 */
 RF24 radio(31, 10); // CE, CSN
 const byte address[6] = "00001"; // must be the same on both NRF
-volatile bool messageAvailable = false; // will be true if we recieved something 
+volatile bool messageAvailable = false; // will be true if we recieved something
 
 // structure data to send or recieve
 struct Data {
@@ -110,15 +110,13 @@ struct Data {
 };
 Data dataToSend = { 0, 0, 0, 0 };
 Data dataReceived;
-
 //*********************** FIN NRF ********************************
 
 // ================================================================
 // ===              PID Variable declaration                   ====
 // ================================================================
 //////////////////////////////PID FOR ROLL///////////////////////////
-float roll_PID, pwm_L_F, pwm_L_B, pwm_R_F, pwm_R_B, roll_error,
-    roll_previous_error;
+float roll_PID, pwm_L_F, pwm_L_B, pwm_R_F, pwm_R_B, roll_error, roll_previous_error;
 float roll_pid_p = 0;
 float roll_pid_i = 0;
 float roll_pid_d = 0;
@@ -139,9 +137,6 @@ double pitch_ki = 0.0; // 0.006;       // 0.003
 double pitch_kd = 0.0; // 1.22;        // 2.05
 float pitch_desired_angle = 0; // This is the angle in which we whant the
 
-float elapsedTime, mytime, timePrev; // Variables for time control
-
-
 // ================================================================
 // ===               fonction declaration                      ====
 // ================================================================
@@ -158,59 +153,48 @@ void NRF24L01_IRQ(void);
 volatile bool mpuInterrupt = false; // indicates whether MPU interrupt pin has gone high
 void dmpDataReady() { mpuInterrupt = true; }
 
-
-
 // ================================================================
 // ===                      INITIAL SETUP                       ===
 // ================================================================
 void setup()
 {
     Serial.begin(115200);
-    init_esc(); // sans calibration
-    init_servos_esc();
+    // --------- init the ESCs, servos -------------------------------
+    init_esc(); // sans calibration en premier et on met le Throtle a 1000 (zero) 4 moteurs stop
+    init_servos_esc(); // les 4 servos pour les 4 moteurs
     delay(500);
-    init_servos_avion();
-    delay(1000);
+    // on ajuste pour etre perpendiculaires
     servo_pwm_FL = 90;
     servo_pwm_FR = 90;
-    servo_pwm_RL = 85;
+    servo_pwm_RL = 85; 
     servo_pwm_RR = 85;
     servo_FL.write(servo_pwm_FL);
     servo_RL.write(servo_pwm_RL);
     servo_RR.write(servo_pwm_RR);
     servo_FR.write(servo_pwm_FR);
     delay(500);
+    init_servos_avion(); // pour les servos mode avion
+    delay(500);
 
+    // ************************ Setup  MPU6050 **************************************************
     Wire.begin();
-    Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having
-                           // compilation difficulties
-    // initialize device
+    Wire.setClock(400000); // 400kHz I2C clock.
+    // ----- initialize device -------------------------
     Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
     pinMode(INTERRUPT_PIN, INPUT);
-
     // verify connection
     Serial.println(F("Testing device connections..."));
-    Serial.println(mpu.testConnection() ? F("MPU6050 connection successful")
-                                        : F("MPU6050 connection failed"));
-    /*
-      // wait for ready
-      Serial.println(F("\nSend any character to begin DMP programming and demo:
-      ")); while (Serial.available() && Serial.read()) ;  // empty buffer while
-      (!Serial.available()) ;  // wait for data while (Serial.available() &&
-      Serial.read()) ;  // empty buffer again
-     */
-    // load and configure the DMP
+    Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
+    // ------ load and configure the DMP --------------
     delay(100);
     Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
-
     // supply your own gyro offsets here, scaled for min sensitivity
     mpu.setXGyroOffset(220);
     mpu.setYGyroOffset(76);
     mpu.setZGyroOffset(-85);
     mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
-
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
         // Calibration Time: generate offsets and calibrate our MPU6050
@@ -220,20 +204,15 @@ void setup()
         // turn on the DMP, now that it's ready
         Serial.println(F("Enabling DMP..."));
         mpu.setDMPEnabled(true);
-
         // enable Arduino interrupt detection
-        Serial.print(
-            F("Enabling interrupt detection (Arduino external interrupt "));
+        Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
         Serial.print(digitalPinToInterrupt(INTERRUPT_PIN));
         Serial.println(F(")..."));
         attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
         mpuIntStatus = mpu.getIntStatus();
-
-        // set our DMP Ready flag so the main loop() function knows it's okay to use
-        // it
+        // set our DMP Ready flag so the main loop() function knows it's okay to use it
         Serial.println(F("DMP ready! Waiting for first interrupt..."));
         dmpReady = true;
-
         // get expected DMP packet size for later comparison
         packetSize = mpu.dmpGetFIFOPacketSize();
     } else {
@@ -246,15 +225,16 @@ void setup()
         Serial.println(F(")"));
     }
 
-    //********************* SET UP NRF ********************
+    //********************* SET UP NRF **********************************************
+    // set interrupt
     pinMode(32, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(32), NRF24L01_IRQ, FALLING);
     Serial.println("checking SPI pins....");
-
+    
     radio.begin();
-    radio.setChannel(52);
-    radio.setPALevel(RF24_PA_MIN);
-    radio.setDataRate(RF24_250KBPS);
+    radio.setChannel(52); // we define the optimal channel
+    radio.setPALevel(RF24_PA_MIN); // set the TX power output
+    radio.setDataRate(RF24_250KBPS); // set kbits/second : the lowest => max distance
     radio.maskIRQ(1, 1, 0); // enable only IRQ on RX event
 
     radio.openWritingPipe(address);
@@ -265,8 +245,7 @@ void setup()
     Serial.println(radio.getPALevel());
     Serial.println(radio.isChipConnected());
     radio.printDetails();
-
-    delay(1);
+    delay(10);
     //********************* FIN SET UP NRF ****************
 }
 
@@ -277,10 +256,10 @@ void setup()
 void loop()
 {
     //************************ NRF *************************
-    if (messageAvailable) {
+    if (messageAvailable) { // if we recieved something
         messageAvailable = false;
-        if (radio.available()) {
-            radio.read(&dataReceived, sizeof(Data));
+        if (radio.available()) { // we check if data recieved are available
+            radio.read(&dataReceived, sizeof(Data)); // get the data 
             throtle = dataReceived.throtle;
             pitch = dataReceived.pitch;
             roll = dataReceived.roll;
@@ -308,6 +287,8 @@ void loop()
     }
     //************************ FIN NRF *********************
 
+    // **************** set motors speed *****************
+    // see the doc mpu_capteurs.docx page 6
     PWM_FR = throtle - roll - pitch; // motor 1
     PWM_RR = throtle - roll + pitch; // motor 2
     PWM_RL = throtle + roll + pitch; // motor 3
