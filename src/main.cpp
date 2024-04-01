@@ -11,33 +11,25 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "Wire.h"
 
-MPU6050 mpu;
-// MPU6050 mpu(0x69); // <-- use for AD0 high
-
-#define INTERRUPT_PIN 33 // use pin 2 on Arduino Uno & most boards
-
+// ------------ for the IMU MPU6050 with the DMP using I2Cdev lib -----------------
+MPU6050 mpu; // MPU6050 mpu(0x69); // <-- use for AD0 high
+#define INTERRUPT_PIN 33 // use pin 33 for teensy could be any digital
 // MPU control/status vars
 bool dmpReady = false; // set true if DMP init was successful
 uint8_t mpuIntStatus; // holds actual interrupt status byte from MPU
-uint8_t devStatus; // return status after each device operation (0 = success,
-                   // !0 = error)
+uint8_t devStatus; // return status after each device operation (0 = success, !0 = error)
 uint16_t packetSize; // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount; // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
-
 // orientation/motion vars
 Quaternion q; // [w, x, y, z]         quaternion container
 VectorInt16 aa; // [x, y, z]            accel sensor measurements
-VectorInt16
-    aaReal; // [x, y, z]            gravity-free accel sensor measurements
-VectorInt16
-    aaWorld; // [x, y, z]            world-frame accel sensor measurements
+VectorInt16 aaReal; // [x, y, z]            gravity-free accel sensor measurements
+VectorInt16 aaWorld; // [x, y, z]            world-frame accel sensor measurements
 VectorFloat gravity; // [x, y, z]            gravity vector
 float euler[3]; // [psi, theta, phi]    Euler angle container
-float
-    ypr[3]; // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
+float ypr[3]; // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
-int throtle = 1000;
 //=============================================================================
 // define motors servos
 //=============================================================================
@@ -86,11 +78,14 @@ int pwm_AR = 0;
 int pwm_D = 0;
 int pwm_P = 0;
 
+int throtle = 1000;
 int pitch = 0;
 int roll = 0;
 int yaw = 0;
 
-//********************************** NRF *************************
+// ================================================================
+// ===            NRF24L01 Variable declaration                ====
+// ================================================================
 /*
 connection Teensy 4 a NRF24L01
 GND  -> GND
@@ -102,29 +97,25 @@ MOSI -> 11
 MISO -> 12
 IRQ  -> 32  (non lie a SPI donc peut etre changee)
 */
-
 RF24 radio(31, 10); // CE, CSN
-const byte address[6] = "00001";
-volatile bool messageAvailable = false;
+const byte address[6] = "00001"; // must be the same on both NRF
+volatile bool messageAvailable = false; // will be true if we recieved something 
 
+// structure data to send or recieve
 struct Data {
     int throtle;
     int roll;
     int pitch;
     int yaw;
 };
-
 Data dataToSend = { 0, 0, 0, 0 };
 Data dataReceived;
 
-//********************************** FIN NRF *********************
-// fonction declaration
-void init_esc_cal(void);
-void init_esc(void);
-void init_servos_esc(void);
-void init_servos_avion(void);
-void pid_simple(void);
-void NRF24L01_IRQ(void);
+//*********************** FIN NRF ********************************
+
+// ================================================================
+// ===              PID Variable declaration                   ====
+// ================================================================
 //////////////////////////////PID FOR ROLL///////////////////////////
 float roll_PID, pwm_L_F, pwm_L_B, pwm_R_F, pwm_R_B, roll_error,
     roll_previous_error;
@@ -150,17 +141,28 @@ float pitch_desired_angle = 0; // This is the angle in which we whant the
 
 float elapsedTime, mytime, timePrev; // Variables for time control
 
+
+// ================================================================
+// ===               fonction declaration                      ====
+// ================================================================
+void init_esc_cal(void);
+void init_esc(void);
+void init_servos_esc(void);
+void init_servos_avion(void);
+void pid_simple(void);
+void NRF24L01_IRQ(void);
+
 // ================================================================
 // ===               INTERRUPT DETECTION ROUTINE                ===
 // ================================================================
-
 volatile bool mpuInterrupt = false; // indicates whether MPU interrupt pin has gone high
 void dmpDataReady() { mpuInterrupt = true; }
+
+
 
 // ================================================================
 // ===                      INITIAL SETUP                       ===
 // ================================================================
-
 void setup()
 {
     Serial.begin(115200);
@@ -305,14 +307,6 @@ void loop()
         }
     }
     //************************ FIN NRF *********************
-
-    /*
-     PWM_FL = PWM_RL = PWM_RR = PWM_FR = throtle;
-     ESC_FL.writeMicroseconds(PWM_FL);
-     ESC_RL.writeMicroseconds(PWM_RL);
-     ESC_RR.writeMicroseconds(PWM_RR);
-     ESC_FR.writeMicroseconds(PWM_FR);
-   */
 
     PWM_FR = throtle - roll - pitch; // motor 1
     PWM_RR = throtle - roll + pitch; // motor 2
