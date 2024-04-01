@@ -511,7 +511,7 @@ void init_esc_cal(void)
      while (!Serial.available()) {
      } */
     // while (Serial.read() != -1);
-    delay(5000);
+    delay(4000);
 
     Serial.println(" mise a 0 et attente de 5 sec pour un autre bip");
     PWM_FL = PWM_RL = PWM_RR = PWM_FR = 1000;
