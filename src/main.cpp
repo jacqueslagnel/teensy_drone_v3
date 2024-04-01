@@ -551,28 +551,11 @@ void init_esc_cal(void)
 
 void init_esc(void)
 {
-    /* while (1)
-    {
-      throtle = analogRead(A3);
-      Serial.println(throtle);
-      delay(250);
-    } */
     // Servo for the ESC
-    ESC_FL.attach(
-        PIN_FL, 1000,
-        2000); // FL range 1000 usec =full stop to 2000 usec =>full speed
-
-    ESC_RL.attach(
-        PIN_RL, 1000,
-        2000); // RL range 1000 usec =full stop to 2000 usec =>full speed
-
-    ESC_RR.attach(
-        PIN_RR, 1000,
-        2000); // RR range 1000 usec =full stop to 2000 usec =>full speed
-
-    ESC_FR.attach(
-        PIN_FR, 1000,
-        2000); // FR range 1000 usec =full stop to 2000 usec =>full speed
+    ESC_FL.attach(PIN_FL, 1000, 2000); // FL range 1000 usec =full stop to 2000 usec =>full speed
+    ESC_RL.attach(PIN_RL, 1000, 2000); // RL range 1000 usec =full stop to 2000 usec =>full speed
+    ESC_RR.attach(PIN_RR, 1000, 2000); // RR range 1000 usec =full stop to 2000 usec =>full speed
+    ESC_FR.attach(PIN_FR, 1000, 2000); // FR range 1000 usec =full stop to 2000 usec =>full speed
 
     PWM_FL = PWM_RL = PWM_RR = PWM_FR = 1000;
     ESC_FL.writeMicroseconds(PWM_FL);
