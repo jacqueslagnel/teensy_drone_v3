@@ -166,7 +166,7 @@ void setup()
     // on ajuste pour etre perpendiculaires
     servo_pwm_FL = 90;
     servo_pwm_FR = 90;
-    servo_pwm_RL = 85; 
+    servo_pwm_RL = 85;
     servo_pwm_RR = 85;
     servo_FL.write(servo_pwm_FL);
     servo_RL.write(servo_pwm_RL);
@@ -230,7 +230,7 @@ void setup()
     pinMode(32, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(32), NRF24L01_IRQ, FALLING);
     Serial.println("checking SPI pins....");
-    
+
     radio.begin();
     radio.setChannel(52); // we define the optimal channel
     radio.setPALevel(RF24_PA_MIN); // set the TX power output
@@ -259,7 +259,7 @@ void loop()
     if (messageAvailable) { // if we recieved something
         messageAvailable = false;
         if (radio.available()) { // we check if data recieved are available
-            radio.read(&dataReceived, sizeof(Data)); // get the data 
+            radio.read(&dataReceived, sizeof(Data)); // get the data
             throtle = dataReceived.throtle;
             pitch = dataReceived.pitch;
             roll = dataReceived.roll;
